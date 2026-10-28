@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MAYA LIVE TRACKING</title>
+<meta name="description" content="Dashboard for a black Yamaha XSR 155. Phase 1 is a design preview; GPS is not connected yet.">
+<meta name="theme-color" content="#080909">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23080909'/%3E%3Cpath d='M7 24V8l9 10 9-10v16' fill='none' stroke='%23C9A44C' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="app">
+
+  <header class="head">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#080909"/><path d="M7 24V8l9 10 9-10v16" fill="none" stroke="#C9A44C" stroke-width="3" stroke-linejoin="round"/></svg>
+      <h1 class="wordmark">MAYA LIVE TRACKING</h1>
+    </div>
+    <div class="bike">
+      <span class="swatch" aria-hidden="true"></span>
+      <span class="bike-text"><span class="bike-model">Yamaha XSR 155</span><span class="bike-sub">Maya, matte black</span></span>
+    </div>
+  </header>
+
+  <nav class="nav" aria-label="Main sections">
+    <ul>
+      <li><button type="button" data-view="ride" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l4-5"/></svg><span>Ride</span></button></li>
+      <li><button type="button" data-view="history">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg><span>History</span></button></li>
+      <li><button type="button" data-view="garage">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5a4 4 0 0 0-4.8 5.2L4 16.4 7.6 20l5.7-5.7a4 4 0 0 0 5.2-4.8l-2.6 2.6-2.4-.5-.5-2.4z"/></svg><span>Garage</span></button></li>
+      <li><button type="button" data-view="safety">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.4-3 7.8-7 9.5-4-1.7-7-5.1-7-9.5V6z"/></svg><span>Safety</span></button></li>
+      <li><button type="button" data-view="settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M4 16h16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg><span>Settings</span></button></li>
+    </ul>
+  </nav>
+
+  <main class="main" id="main">
+
+    <!-- RIDE -->
+    <section class="view" id="view-ride" aria-labelledby="h-ride">
+      <h2 class="view-title" id="h-ride" tabindex="-1">Ride</h2>
+      <p class="preview-note">Design preview. Nothing on this screen is live yet.</p>
+
+      <div class="ride-grid">
+
+        <div class="ride-left">
+          <div class="cluster">
+            <svg class="gauge" viewBox="0 0 300 300" aria-hidden="true" focusable="false">
+              <defs>
+                <linearGradient id="goldGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#E4C56A"/><stop offset="1" stop-color="#C9A44C"/>
+                </linearGradient>
+              </defs>
+              <circle cx="150" cy="150" r="143" fill="none" stroke="url(#goldGrad)" stroke-opacity=".3" stroke-width="1"/>
+              <path d="M65.15 234.85A120 120 0 1 1 234.85 234.85" fill="none" stroke="#2a2a2a" stroke-width="10" stroke-linecap="round"/>
+              <g id="ticks"></g>
+              <circle cx="65.15" cy="234.85" r="5" fill="url(#goldGrad)"/>
+            </svg>
+            <div class="gauge-read">
+              <p class="speed" id="speed"><span class="speed-num">--</span> <span class="speed-unit">km/h</span></p>
+              <p class="speed-note"><span class="sr-only">Speed is not available. </span>GPS not connected</p>
+            </div>
+          </div>
+
+          <ul class="chips" aria-label="Connection status">
+            <li class="chip"><span class="dot dot-off" aria-hidden="true"></span>GPS not connected</li>
+            <li class="chip"><span class="dot dot-off" aria-hidden="true"></span>Live sharing off</li>
+          </ul>
+
+          <dl class="readouts">
+            <div><dt>Ride distance</dt><dd><span class="num">--</span> <span class="unit">km</span></dd></div>
+            <div><dt>Ride time</dt><dd><span class="num">--:--:--</span></dd></div>
+          </dl>
+
+          <div class="controls">
+            <button type="button" class="btn start" disabled aria-describedby="ctl-hint">Start ride</button>
+            <button type="button" class="btn end" disabled aria-describedby="ctl-hint">End ride</button>
+          </div>
+          <p class="hint" id="ctl-hint">Ride controls stay off until live GPS is added in the next phase.</p>
+        </div>
+
+        <section class="ride-right" aria-labelledby="h-map">
+          <h3 class="sr-only" id="h-map">Map preview</h3>
+          <div class="map-frame">
+            <div id="map"></div>
+            <div class="map-overlay" role="status">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.6-6-10.5a6 6 0 0 1 12 0C18 15.4 12 21 12 21z"/><path d="M4 4l16 16"/></svg>
+              <p class="overlay-title">GPS is not connected yet</p>
+              <p class="overlay-text">Your position will appear here once live tracking is added.</p>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="view soon" id="view-history" aria-labelledby="h-history" hidden>
+      <h2 class="view-title" id="h-history" tabindex="-1">History</h2>
+      <span class="tag">Coming soon</span>
+      <p class="soon-lead">Every ride you finish will be saved here, so you can look back on it.</p>
+      <ul class="soon-list"><li>Date, distance and time for each ride</li><li>Weekly and monthly totals</li><li>Export your rides to a spreadsheet</li></ul>
+    </section>
+
+    <!-- GARAGE -->
+    <section class="view soon" id="view-garage" aria-labelledby="h-garage" hidden>
+      <h2 class="view-title" id="h-garage" tabindex="-1">Garage</h2>
+      <span class="tag">Coming soon</span>
+      <p class="soon-lead">Everything about Maya itself, kept in one place.</p>
+      <ul class="soon-list"><li>Odometer and fuel log with mileage</li><li>Service history and reminders</li><li>Insurance and PUC expiry dates</li></ul>
+    </section>
+
+    <!-- SAFETY -->
+    <section class="view soon" id="view-safety" aria-labelledby="h-safety" hidden>
+      <h2 class="view-title" id="h-safety" tabindex="-1">Safety</h2>
+      <span class="tag">Coming soon</span>
+      <p class="soon-lead">Tools to get help quickly if something goes wrong on a ride.</p>
+      <ul class="soon-list"><li>Emergency contacts</li><li>An SOS button you hold to confirm</li><li>Break and check-in timers</li></ul>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="view soon" id="view-settings" aria-labelledby="h-settings" hidden>
+      <h2 class="view-title" id="h-settings" tabindex="-1">Settings</h2>
+      <span class="tag">Coming soon</span>
+      <p class="soon-lead">Choose how the app looks, measures and shares.</p>
+      <ul class="soon-list"><li>Units for speed and distance</li><li>Who can see your live ride</li><li>Export and delete your data</li></ul>
+    </section>
+
+  </main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="js/app.js"></script>
+</body>
+</html>
