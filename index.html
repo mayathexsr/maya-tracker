@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>MAYA LIVE TRACKING</title>
-<meta name="description" content="Dashboard for a black Yamaha XSR 155. Phase 1 is a design preview; GPS is not connected yet.">
+<meta name="description" content="Dashboard for a black Yamaha XSR 155. Live GPS ride tracking.">
 <meta name="theme-color" content="#080909">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23080909'/%3E%3Cpath d='M7 24V8l9 10 9-10v16' fill='none' stroke='%23C9A44C' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
@@ -102,35 +102,96 @@
     </section>
 
     <!-- HISTORY -->
-    <section class="view soon" id="view-history" aria-labelledby="h-history" hidden>
+    <section class="view panel" id="view-history" aria-labelledby="h-history" hidden>
       <h2 class="view-title" id="h-history" tabindex="-1">History</h2>
-      <span class="tag">Coming soon</span>
-      <p class="soon-lead">Every ride you finish will be saved here, so you can look back on it.</p>
-      <ul class="soon-list"><li>Date, distance and time for each ride</li><li>Weekly and monthly totals</li><li>Export your rides to a spreadsheet</li></ul>
+      <p class="notice"><strong>Rides are not saved yet.</strong> Finished rides appear below while this page stays open. If you refresh or close the page, the list is erased, because saving rides on your phone has not been built yet.</p>
+      <dl class="totals" aria-label="Totals for this page visit">
+        <div><dt>Rides</dt><dd id="hist-count">0</dd></div>
+        <div><dt>Distance</dt><dd><span id="hist-dist">0.00</span> <span class="unit js-dist-unit">km</span></dd></div>
+        <div><dt>Ride time</dt><dd id="hist-time">00:00:00</dd></div>
+      </dl>
+      <p class="empty" id="hist-empty">No finished rides yet. Start and end a ride on the Ride tab and it will show up here.</p>
+      <ul class="ride-list" id="ride-list"></ul>
+      <button type="button" class="btn quiet" id="hist-clear" hidden>Clear this list</button>
     </section>
 
     <!-- GARAGE -->
-    <section class="view soon" id="view-garage" aria-labelledby="h-garage" hidden>
+    <section class="view panel" id="view-garage" aria-labelledby="h-garage" hidden>
       <h2 class="view-title" id="h-garage" tabindex="-1">Garage</h2>
-      <span class="tag">Coming soon</span>
-      <p class="soon-lead">Everything about Maya itself, kept in one place.</p>
-      <ul class="soon-list"><li>Odometer and fuel log with mileage</li><li>Service history and reminders</li><li>Insurance and PUC expiry dates</li></ul>
+      <div class="bike-card">
+        <span class="swatch big" aria-hidden="true"></span>
+        <div><p class="bike-name">Maya</p><p class="bike-full">Yamaha XSR 155</p></div>
+      </div>
+      <dl class="spec">
+        <div><dt>Nickname</dt><dd>Maya</dd></div>
+        <div><dt>Make and model</dt><dd>Yamaha XSR 155</dd></div>
+        <div><dt>Colour</dt><dd>Matte black</dd></div>
+        <div><dt>Ridden this page visit</dt><dd id="garage-session">No rides finished yet</dd></div>
+      </dl>
+      <p class="notice">Only confirmed details are shown here, and nothing is guessed. Specifications, odometer, fuel and service records are not included yet.</p>
     </section>
 
     <!-- SAFETY -->
-    <section class="view soon" id="view-safety" aria-labelledby="h-safety" hidden>
+    <section class="view panel" id="view-safety" aria-labelledby="h-safety" hidden>
       <h2 class="view-title" id="h-safety" tabindex="-1">Safety</h2>
-      <span class="tag">Coming soon</span>
-      <p class="soon-lead">Tools to get help quickly if something goes wrong on a ride.</p>
-      <ul class="soon-list"><li>Emergency contacts</li><li>An SOS button you hold to confirm</li><li>Break and check-in timers</li></ul>
+      <p class="notice"><strong>This app cannot call for help for you.</strong> It does not detect crashes or send alerts. Set it up before you ride, and do not use your phone while the bike is moving.</p>
+
+      <h3 class="sub">Before you ride</h3>
+      <ul class="checklist">
+        <li>Helmet on and fastened, with protective gear</li>
+        <li>Tyres, brakes, chain and lights checked</li>
+        <li>Phone fixed in its mount, and the ride started before you move off</li>
+        <li>Enough fuel, and someone knows where you are going</li>
+      </ul>
+
+      <h3 class="sub">If something goes wrong</h3>
+      <ul class="checklist">
+        <li>Get yourself and the bike somewhere safe, away from traffic</li>
+        <li>Call <a href="tel:112">112</a>, India's national emergency number, or the local emergency number if you are elsewhere</li>
+        <li>Say exactly where you are, using a road name or a landmark</li>
+        <li>Do not ride on if you are hurt or the bike is not safe</li>
+      </ul>
+
+      <h3 class="sub">Emergency contacts</h3>
+      <p class="muted">Up to 3 people you can call quickly. They are saved on this phone, in this browser only, and are never sent anywhere.</p>
+      <ul class="contacts" id="contact-list"></ul>
+      <p class="empty" id="contact-empty">No emergency contacts yet.</p>
+      <form class="form" id="contact-form" novalidate>
+        <label for="contact-name">Name</label>
+        <input type="text" id="contact-name" maxlength="40" autocomplete="off">
+        <label for="contact-phone">Phone number</label>
+        <input type="tel" id="contact-phone" maxlength="20" autocomplete="off" inputmode="tel">
+        <button type="submit" class="btn primary" id="contact-add">Add contact</button>
+      </form>
+      <p class="form-msg" id="contact-msg" role="status"></p>
     </section>
 
     <!-- SETTINGS -->
-    <section class="view soon" id="view-settings" aria-labelledby="h-settings" hidden>
+    <section class="view panel" id="view-settings" aria-labelledby="h-settings" hidden>
       <h2 class="view-title" id="h-settings" tabindex="-1">Settings</h2>
-      <span class="tag">Coming soon</span>
-      <p class="soon-lead">Choose how the app looks, measures and shares.</p>
-      <ul class="soon-list"><li>Units for speed and distance</li><li>Who can see your live ride</li><li>Export and delete your data</li></ul>
+
+      <fieldset class="group">
+        <legend>Units</legend>
+        <label class="opt"><input type="radio" name="units" value="metric" id="set-metric"><span>Kilometres and km/h</span></label>
+        <label class="opt"><input type="radio" name="units" value="imperial" id="set-imperial"><span>Miles and mph</span></label>
+      </fieldset>
+
+      <div class="group">
+        <label class="opt"><input type="checkbox" id="set-awake"><span>Keep the screen on during a ride</span></label>
+        <p class="muted" id="awake-note">Helps GPS keep running. It uses more battery.</p>
+      </div>
+
+      <div class="group">
+        <h3 class="sub">About GPS figures</h3>
+        <p class="muted">Speed comes from your phone's GPS. Distance is an estimate: readings less accurate than 50 m are ignored, and small drifts while standing still are not counted. It is not your bike's odometer.</p>
+      </div>
+
+      <p class="notice">Settings are saved on this phone, in this browser. Ride history is not saved yet.</p>
+      <div class="actions">
+        <button type="button" class="btn quiet" id="set-reset">Reset settings</button>
+        <button type="button" class="btn quiet" id="set-erase">Erase saved data</button>
+      </div>
+      <p class="form-msg" id="settings-msg" role="status"></p>
     </section>
 
   </main>
