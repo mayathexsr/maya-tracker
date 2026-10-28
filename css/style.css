@@ -189,3 +189,87 @@ button{font:inherit;color:inherit}
   .ride-right{position:sticky;top:32px}
   .map-frame{height:min(72vh,680px);min-height:420px}
 }
+
+/* ---------- History, Garage, Safety and Settings panels ---------- */
+.panel{max-width:640px}
+.panel .view-title{margin-bottom:12px}
+.sub{font-size:18px;font-weight:600;margin:26px 0 8px}
+.muted{color:var(--muted);font-size:15px}
+.notice{padding:12px 14px;border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:12px;background:var(--card);font-size:15px;margin-bottom:18px}
+.notice strong{color:var(--gold-hi);font-weight:600}
+.empty{color:var(--muted);padding:14px 0}
+.form-msg{min-height:22px;margin-top:8px;font-size:14px;color:var(--gold-hi)}
+
+/* History */
+.totals{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:8px}
+.totals>div{padding:12px 4px;text-align:center}
+.totals>div+div{border-left:1px solid var(--line)}
+.totals dt{font-size:13px;color:var(--muted)}
+.totals dd{font-size:22px;font-weight:300;font-variant-numeric:tabular-nums}
+.totals .unit{font-size:14px;color:var(--gold-hi)}
+.ride-list{margin-bottom:16px}
+.ride-list>li{border-bottom:1px solid var(--line)}
+.ride-list summary{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 2px;cursor:pointer;list-style:none}
+.ride-list summary::-webkit-details-marker{display:none}
+.ride-list summary::after{content:"+";color:var(--gold);font-size:22px;margin-left:4px}
+.ride-list details[open] summary::after{content:"\2212"}
+.ride-when{font-weight:600}
+.ride-sum{margin-left:auto;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.ride-facts{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:2px 0 8px}
+.ride-facts>div{background:var(--card);padding:10px 12px}
+.ride-facts dt{font-size:13px;color:var(--muted)}
+.ride-facts dd{font-size:18px;font-variant-numeric:tabular-nums}
+.ride-foot{font-size:13px;color:var(--muted);margin:0 2px 14px}
+
+/* Garage */
+.bike-card{display:flex;align-items:center;gap:16px;padding:18px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(160deg,#1c1c1b,#101112);margin-bottom:14px}
+.swatch.big{width:56px;height:56px;flex:none;box-shadow:0 0 0 3px var(--obsidian),0 0 0 4px var(--gold)}
+.bike-name{font-size:28px;font-weight:600;letter-spacing:.08em;line-height:1.1}
+.bike-full{color:var(--gold-hi)}
+.spec{border-top:1px solid var(--line);margin-bottom:16px}
+.spec>div{display:flex;justify-content:space-between;gap:16px;padding:12px 2px;border-bottom:1px solid var(--line)}
+.spec dt{color:var(--muted)}
+.spec dd{text-align:right}
+
+/* Safety */
+.checklist{border-top:1px solid var(--line)}
+.checklist li{position:relative;padding:11px 0 11px 22px;border-bottom:1px solid var(--line)}
+.checklist li::before{content:"";position:absolute;left:4px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--gold)}
+.contacts>li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.contact-info{flex:1;min-width:0}
+.contact-name{font-weight:600;overflow-wrap:anywhere}
+.contact-phone{color:var(--muted);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.mini{min-height:44px;min-width:44px;padding:0 14px;border-radius:10px;border:1px solid #555;background:transparent;color:var(--text);font:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.mini.call{border-color:var(--gold);color:var(--gold-hi)}
+.form{display:grid;gap:8px;margin-top:14px}
+.form label{font-size:14px;color:var(--muted)}
+input[type="text"],input[type="tel"]{width:100%;min-height:48px;padding:0 14px;border-radius:12px;border:1px solid #444;background:var(--bg);color:var(--text);font:inherit;font-size:16px}
+input[type="text"]:focus-visible,input[type="tel"]:focus-visible{outline:2px solid var(--gold-hi);outline-offset:2px}
+.form .btn{margin-top:6px}
+
+/* Settings */
+.group{border:0;padding:0;margin:0 0 18px;min-width:0}
+fieldset.group legend{padding:0;margin-bottom:4px;font-size:18px;font-weight:600}
+.opt{display:flex;align-items:center;gap:12px;min-height:48px;cursor:pointer}
+.opt input{width:22px;height:22px;flex:none;accent-color:var(--gold)}
+.actions{display:grid;gap:10px;margin-top:8px}
+.btn.quiet{background:transparent;color:var(--text);border:1px solid #555;min-height:48px;font-size:16px;font-weight:500;letter-spacing:.02em}
+.btn.quiet:hover{border-color:var(--gold)}
+#hist-clear{width:100%}
+
+@media (min-width:480px){
+  .actions{grid-template-columns:1fr 1fr}
+}
+
+.btn.primary{background:linear-gradient(180deg,var(--gold-hi),var(--gold));color:#0b0b0a;border:0}
+
+/* Links on the panels use the gold, not the browser's default blue */
+.panel a{color:var(--gold-hi);text-underline-offset:3px}
+
+/* Small phones: keep the full MAYA LIVE TRACKING wordmark on screen */
+@media (max-width:430px){
+  .wordmark{font-size:13px;letter-spacing:.1em}
+  .brand{gap:8px}
+  .mark{width:30px;height:30px}
+  .bike-model{font-size:13px}
+}
