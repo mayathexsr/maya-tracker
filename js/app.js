@@ -1,14 +1,18 @@
-/* MAYA LIVE TRACKING - Phase 2: live GPS ride tracking.
+/* MAYA LIVE TRACKING - Phase 2b: GPS ride tracking plus working History, Garage, Safety and Settings.
 
    What this file does:
-   - switches between the five sections, draws the gauge ticks, shows the map (as in Phase 1)
+   - switches between the five sections, draws the gauge ticks, shows the map
    - asks for location ONLY after you tap Start ride (never on page load)
    - tracks the ride with navigator.geolocation.watchPosition()
    - shows GPS speed, estimated distance and elapsed time
-   - stops everything cleanly when you tap End ride
+   - History: lists finished rides while the page stays open (NOT saved: a refresh erases them)
+   - Garage: shows the bike details and this page visit's ride totals
+   - Safety: emergency contacts, saved in this browser's localStorage on this phone only
+   - Settings: units (metric or imperial) and "keep screen on", saved in localStorage
 
    It does NOT use Firebase, logins, cloud storage, external APIs or live sharing.
-   Nothing is saved anywhere: ride numbers disappear when you start a new ride or reload.
+   The only things stored are your settings and emergency contacts, on this phone, in this
+   browser. Ride history is never stored.
 
    FILTERING ASSUMPTIONS (all distances are estimates, not odometer readings):
    1. A reading is ignored if its coordinates or accuracy are missing or impossible.
@@ -27,7 +31,9 @@
       a tunnel, cannot block tracking for good.
    7. Readings that are not newer than the reference reading are ignored.
    8. If no reading arrives for 10 seconds, the screen says the GPS signal is lost and
-      the speed shows "--". Distance and time keep their last values. */
+      the speed shows "--". Distance and time keep their last values.
+   9. A ride is added to History only if at least one accurate position was recorded.
+      Average speed includes stops, and is shown only for rides of 100 m and 30 seconds or more. */
 (function () {
   "use strict";
 
@@ -42,6 +48,11 @@
   var STATIONARY_MS = 0.5;
   var STALE_AFTER_MS = 10000;
   var EARTH_RADIUS_M = 6371000;
+  var KM_TO_MI = 0.621371;
+  var MAX_CONTACTS = 3;
+  var MAX_RIDES = 50;
+  var STORE_SETTINGS = "mayaTracker.settings";
+  var STORE_CONTACTS = "mayaTracker.contacts";
   var GEO_OPTIONS = { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 };
 
   var HINT_IDLE = "Tap Start ride. Your phone will ask for permission to use your location.";
@@ -51,12 +62,19 @@
   var navButtons = document.querySelectorAll("[data-view]");
   var map = null;
 
+  /* ---------- Saved preferences and in-memory lists ---------- */
+  var settings = { units: "metric", wakeLock: true };
+  var contacts = [];
+  var rides = [];              /* finished rides; kept in memory only */
+
   /* ---------- Ride state ---------- */
   var state = "idle";          /* "idle" or "riding" */
   var watchId = null;
   var timerId = null;
   var rideStartMs = 0;
   var distanceM = 0;
+  var topSpeedKmh = null;
+  var lastSpeedKmh = null;
   var anchor = null;           /* last accepted reference reading */
   var outliers = 0;
   var lastFixAt = 0;           /* when the last usable reading arrived */
@@ -65,23 +83,50 @@
   var accuracyCircle = null;
   var lastPan = null;
   var gpsKey = "";
+  var wakeLock = null;
+  var wakeLockPending = false;
   var supported = ("geolocation" in navigator);
 
   /* ---------- Page elements ---------- */
   var speedEl = document.getElementById("speed");
   var speedNum = speedEl ? speedEl.querySelector(".speed-num") : null;
+  var speedUnitEl = speedEl ? speedEl.querySelector(".speed-unit") : null;
   var speedNote = document.querySelector(".speed-note");
   var chips = document.querySelectorAll(".chips .chip");
   var gpsChip = chips[0] || null;
   var readoutNums = document.querySelectorAll(".readouts .num");
   var distNum = readoutNums[0] || null;
   var timeNum = readoutNums[1] || null;
+  var distUnitEl = document.querySelector(".readouts .unit");
   var startBtn = document.querySelector(".btn.start");
   var endBtn = document.querySelector(".btn.end");
   var hintEl = document.getElementById("ctl-hint");
+  var previewNote = document.querySelector(".preview-note");
   var overlay = document.querySelector(".map-overlay");
   var overlayTitle = document.querySelector(".overlay-title");
   var overlayText = document.querySelector(".overlay-text");
+
+  var histCount = document.getElementById("hist-count");
+  var histDist = document.getElementById("hist-dist");
+  var histTime = document.getElementById("hist-time");
+  var histEmpty = document.getElementById("hist-empty");
+  var rideList = document.getElementById("ride-list");
+  var histClear = document.getElementById("hist-clear");
+  var garageSession = document.getElementById("garage-session");
+  var contactList = document.getElementById("contact-list");
+  var contactEmpty = document.getElementById("contact-empty");
+  var contactForm = document.getElementById("contact-form");
+  var contactName = document.getElementById("contact-name");
+  var contactPhone = document.getElementById("contact-phone");
+  var contactAdd = document.getElementById("contact-add");
+  var contactMsg = document.getElementById("contact-msg");
+  var setMetric = document.getElementById("set-metric");
+  var setImperial = document.getElementById("set-imperial");
+  var setAwake = document.getElementById("set-awake");
+  var awakeNote = document.getElementById("awake-note");
+  var setReset = document.getElementById("set-reset");
+  var setErase = document.getElementById("set-erase");
+  var settingsMsg = document.getElementById("settings-msg");
 
   /* ---------- Small helpers ---------- */
   function setText(el, text) {
@@ -95,6 +140,13 @@
       }
     }
     el.appendChild(document.createTextNode(text));
+  }
+
+  function make(tag, className, text) {
+    var e = document.createElement(tag);
+    if (className) { e.className = className; }
+    if (text !== undefined) { e.textContent = text; }
+    return e;
   }
 
   function pad(n) { return (n < 10 ? "0" : "") + n; }
@@ -113,9 +165,52 @@
     return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(a)));
   }
 
-  /* ---------- Screen updates ---------- */
+  /* ---------- Browser storage (settings and contacts only) ---------- */
+  function readStore(key) {
+    try {
+      var raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function writeStore(key, value) {
+    try { window.localStorage.setItem(key, JSON.stringify(value)); return true; }
+    catch (e) { return false; }
+  }
+  function removeStore(key) {
+    try { window.localStorage.removeItem(key); } catch (e) { /* nothing to do */ }
+  }
+
+  function loadSettings() {
+    var s = readStore(STORE_SETTINGS);
+    if (s && (s.units === "metric" || s.units === "imperial")) { settings.units = s.units; }
+    if (s && typeof s.wakeLock === "boolean") { settings.wakeLock = s.wakeLock; }
+  }
+
+  function loadContacts() {
+    var list = readStore(STORE_CONTACTS);
+    contacts = [];
+    if (Array.isArray(list)) {
+      list.forEach(function (c) {
+        if (c && typeof c.name === "string" && typeof c.phone === "string" && contacts.length < MAX_CONTACTS) {
+          contacts.push({ name: c.name.slice(0, 40), phone: c.phone.slice(0, 20) });
+        }
+      });
+    }
+  }
+
+  /* ---------- Units ---------- */
+  function isImperial() { return settings.units === "imperial"; }
+  function speedUnit() { return isImperial() ? "mph" : "km/h"; }
+  function distUnit() { return isImperial() ? "mi" : "km"; }
+  function toSpeed(kmh) { return isImperial() ? kmh * KM_TO_MI : kmh; }
+  function toDist(m) { return isImperial() ? (m / 1000) * KM_TO_MI : m / 1000; }
+  function fmtDist(m) { return toDist(m).toFixed(2); }
+  function fmtSpeed(kmh) { return (kmh === null) ? "--" : Math.round(toSpeed(kmh)) + " " + speedUnit(); }
+
+  /* ---------- Screen updates (Ride) ---------- */
   function showSpeed(kmh) {
-    if (speedNum) { speedNum.textContent = (kmh === null) ? "--" : String(Math.round(kmh)); }
+    lastSpeedKmh = kmh;
+    if (speedNum) { speedNum.textContent = (kmh === null) ? "--" : String(Math.round(toSpeed(kmh))); }
     if (speedNote) {
       var sr = speedNote.querySelector(".sr-only");
       if (sr) { sr.textContent = (kmh === null) ? "Speed is not available. " : "Speed from GPS. "; }
@@ -123,7 +218,7 @@
   }
 
   function showDistance() {
-    if (distNum) { distNum.textContent = anchor ? (distanceM / 1000).toFixed(2) : "--"; }
+    if (distNum) { distNum.textContent = anchor ? fmtDist(distanceM) : "--"; }
   }
 
   function showTime(ms) {
@@ -204,6 +299,33 @@
     hasMarker = true;
   }
 
+  /* ---------- Keep the screen on during a ride (optional) ---------- */
+  function wantsWakeLock() { return settings.wakeLock && ("wakeLock" in navigator); }
+
+  function requestWakeLock() {
+    if (!wantsWakeLock() || state !== "riding" || wakeLock !== null || wakeLockPending) { return; }
+    wakeLockPending = true;
+    try {
+      navigator.wakeLock.request("screen").then(function (sentinel) {
+        wakeLockPending = false;
+        if (state !== "riding" || !wantsWakeLock()) { sentinel.release(); return; }
+        wakeLock = sentinel;
+        sentinel.addEventListener("release", function () { if (wakeLock === sentinel) { wakeLock = null; } });
+      }).catch(function () { wakeLockPending = false; });
+    } catch (e) { wakeLockPending = false; }
+  }
+
+  function releaseWakeLock() {
+    if (wakeLock) {
+      try { wakeLock.release(); } catch (e) { /* already released */ }
+      wakeLock = null;
+    }
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) { requestWakeLock(); }   /* the browser drops it when the page is hidden */
+  });
+
   /* ---------- Location readings ---------- */
   function readSpeedKmh(coords) {
     var s = coords.speed;
@@ -239,7 +361,11 @@
         "Your position is too uncertain to show (about " + Math.round(acc) + " m). Move to an open area.");
     }
 
-    showSpeed(good ? readSpeedKmh(c) : null);
+    var speed = good ? readSpeedKmh(c) : null;
+    showSpeed(speed);
+    if (speed !== null && speed <= MAX_SPEED_MS * 3.6 && (topSpeedKmh === null || speed > topSpeedKmh)) {
+      topSpeedKmh = speed;
+    }
 
     if (!good) { return; }
 
@@ -328,6 +454,7 @@
       clearInterval(timerId);
       timerId = null;
     }
+    releaseWakeLock();
   }
 
   function startRide() {
@@ -341,6 +468,7 @@
     state = "riding";
     rideStartMs = Date.now();
     distanceM = 0;
+    topSpeedKmh = null;
     anchor = null;
     outliers = 0;
     lastFixAt = 0;
@@ -358,6 +486,7 @@
       /* The permission prompt appears here, only after you tapped Start ride. */
       watchId = navigator.geolocation.watchPosition(onPosition, onError, GEO_OPTIONS);
       timerId = setInterval(tick, 1000);
+      requestWakeLock();
     } catch (e) {
       stopTracking();
       state = "idle";
@@ -371,7 +500,8 @@
 
   function endRide() {
     if (state !== "riding") { return; }
-    var elapsed = Date.now() - rideStartMs;
+    var endMs = Date.now();
+    var elapsed = endMs - rideStartMs;
     var hadData = (anchor !== null);
     stopTracking();
     state = "idle";
@@ -381,14 +511,245 @@
     removeMarker();
     setGpsStatus("off", "GPS not connected");
     setOverlay(true, "Ride ended", "Tap Start ride to begin a new ride.");
-    setHint(hadData
-      ? "Ride ended. About " + (distanceM / 1000).toFixed(2) + " km in " + formatTime(elapsed) + " (GPS estimate)."
-      : "Ride ended. No accurate GPS position was recorded.");
+    if (hadData) {
+      addRideRecord(endMs, elapsed);
+      setHint("Ride ended. About " + fmtDist(distanceM) + " " + distUnit() + " in " + formatTime(elapsed) +
+        " (GPS estimate). See it in History until you refresh the page.");
+    } else {
+      setHint("Ride ended. No accurate GPS position was recorded, so it was not added to History.");
+    }
     updateButtons();
   }
 
   if (startBtn) { startBtn.addEventListener("click", startRide); }
   if (endBtn) { endBtn.addEventListener("click", endRide); }
+
+  /* ---------- History and Garage ---------- */
+  function addRideRecord(endMs, durationMs) {
+    var avg = (distanceM >= 100 && durationMs >= 30000) ? (distanceM / (durationMs / 1000)) * 3.6 : null;
+    rides.unshift({
+      startMs: rideStartMs, endMs: endMs, durationMs: durationMs,
+      distanceM: distanceM, topKmh: topSpeedKmh, avgKmh: avg
+    });
+    if (rides.length > MAX_RIDES) { rides.length = MAX_RIDES; }
+    renderHistory();
+    renderGarage();
+  }
+
+  function fmtWhen(ms, long) {
+    try {
+      return new Date(ms).toLocaleString(undefined, long
+        ? { dateStyle: "medium", timeStyle: "short" }
+        : { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    } catch (e) { return new Date(ms).toString(); }
+  }
+
+  function detailItem(label, value) {
+    var d = make("div");
+    d.appendChild(make("dt", "", label));
+    d.appendChild(make("dd", "", value));
+    return d;
+  }
+
+  function renderHistory() {
+    if (!rideList) { return; }
+    while (rideList.firstChild) { rideList.removeChild(rideList.firstChild); }
+    var totalM = 0, totalMs = 0;
+
+    rides.forEach(function (r) {
+      totalM += r.distanceM;
+      totalMs += r.durationMs;
+
+      var li = make("li");
+      var details = make("details");
+      var summary = make("summary");
+      summary.appendChild(make("span", "ride-when", fmtWhen(r.startMs, false)));
+      summary.appendChild(make("span", "ride-sum", fmtDist(r.distanceM) + " " + distUnit() + ", " + formatTime(r.durationMs)));
+      details.appendChild(summary);
+
+      var grid = make("dl", "ride-facts");
+      grid.appendChild(detailItem("Started", fmtWhen(r.startMs, true)));
+      grid.appendChild(detailItem("Ended", fmtWhen(r.endMs, true)));
+      grid.appendChild(detailItem("Ride time", formatTime(r.durationMs)));
+      grid.appendChild(detailItem("Distance", fmtDist(r.distanceM) + " " + distUnit()));
+      grid.appendChild(detailItem("Average speed", fmtSpeed(r.avgKmh)));
+      grid.appendChild(detailItem("Top GPS speed", fmtSpeed(r.topKmh)));
+      details.appendChild(grid);
+      details.appendChild(make("p", "ride-foot",
+        "Distance and speeds are GPS estimates. Average speed includes stops. This ride is erased when you refresh the page."));
+
+      li.appendChild(details);
+      rideList.appendChild(li);
+    });
+
+    if (histCount) { histCount.textContent = String(rides.length); }
+    if (histDist) { histDist.textContent = fmtDist(totalM); }
+    if (histTime) { histTime.textContent = formatTime(totalMs); }
+    if (histEmpty) { histEmpty.hidden = rides.length > 0; }
+    if (histClear) { histClear.hidden = rides.length === 0; }
+  }
+
+  function renderGarage() {
+    if (!garageSession) { return; }
+    if (rides.length === 0) {
+      garageSession.textContent = "No rides finished yet";
+      return;
+    }
+    var totalM = 0;
+    rides.forEach(function (r) { totalM += r.distanceM; });
+    garageSession.textContent = rides.length + (rides.length === 1 ? " ride, " : " rides, ") +
+      fmtDist(totalM) + " " + distUnit() + " (GPS estimate)";
+  }
+
+  if (histClear) {
+    histClear.addEventListener("click", function () {
+      rides = [];
+      renderHistory();
+      renderGarage();
+    });
+  }
+
+  /* ---------- Safety: emergency contacts ---------- */
+  function setContactMsg(text) { if (contactMsg) { contactMsg.textContent = text || ""; } }
+
+  function cleanPhone(raw) {
+    var plus = /^\s*\+/.test(raw);
+    return (plus ? "+" : "") + raw.replace(/\D/g, "");
+  }
+
+  function renderContacts() {
+    if (!contactList) { return; }
+    while (contactList.firstChild) { contactList.removeChild(contactList.firstChild); }
+
+    contacts.forEach(function (c, i) {
+      var li = make("li");
+      var info = make("div", "contact-info");
+      info.appendChild(make("div", "contact-name", c.name));
+      info.appendChild(make("div", "contact-phone", c.phone));
+      li.appendChild(info);
+
+      var call = make("a", "mini call", "Call");
+      call.href = "tel:" + cleanPhone(c.phone);
+      call.setAttribute("aria-label", "Call " + c.name);
+      li.appendChild(call);
+
+      var remove = make("button", "mini", "Remove");
+      remove.type = "button";
+      remove.setAttribute("aria-label", "Remove " + c.name);
+      remove.addEventListener("click", function () { removeContact(i); });
+      li.appendChild(remove);
+
+      contactList.appendChild(li);
+    });
+
+    if (contactEmpty) { contactEmpty.hidden = contacts.length > 0; }
+    if (contactAdd) { contactAdd.disabled = contacts.length >= MAX_CONTACTS; }
+  }
+
+  function addContact() {
+    var name = contactName ? contactName.value.trim() : "";
+    var phone = contactPhone ? contactPhone.value.trim() : "";
+    var digits = phone.replace(/\D/g, "").length;
+
+    if (contacts.length >= MAX_CONTACTS) { setContactMsg("You can save up to " + MAX_CONTACTS + " contacts. Remove one first."); return; }
+    if (name === "") { setContactMsg("Please enter a name."); return; }
+    if (!/^[\d\s+\-().]+$/.test(phone) || digits < 5 || digits > 15) {
+      setContactMsg("Please enter a valid phone number, for example +91 98765 43210.");
+      return;
+    }
+
+    contacts.push({ name: name.slice(0, 40), phone: phone.slice(0, 20) });
+    var saved = writeStore(STORE_CONTACTS, contacts);
+    if (contactName) { contactName.value = ""; }
+    if (contactPhone) { contactPhone.value = ""; }
+    renderContacts();
+    setContactMsg(saved
+      ? "Saved on this phone."
+      : "Could not save on this phone (private browsing can block this). It will be lost when you refresh.");
+  }
+
+  function removeContact(index) {
+    contacts.splice(index, 1);
+    if (contacts.length === 0) { removeStore(STORE_CONTACTS); } else { writeStore(STORE_CONTACTS, contacts); }
+    renderContacts();
+    setContactMsg("Contact removed.");
+  }
+
+  if (contactForm) {
+    contactForm.addEventListener("submit", function (ev) { ev.preventDefault(); addContact(); });
+  }
+
+  /* ---------- Settings ---------- */
+  function setSettingsMsg(text) { if (settingsMsg) { settingsMsg.textContent = text || ""; } }
+
+  function syncSettingsControls() {
+    if (setMetric) { setMetric.checked = !isImperial(); }
+    if (setImperial) { setImperial.checked = isImperial(); }
+    if (setAwake) { setAwake.checked = settings.wakeLock; }
+  }
+
+  function applyUnits() {
+    if (speedUnitEl) { speedUnitEl.textContent = speedUnit(); }
+    if (distUnitEl) { distUnitEl.textContent = distUnit(); }
+    Array.prototype.forEach.call(document.querySelectorAll(".js-dist-unit"), function (e) { e.textContent = distUnit(); });
+    buildTicks();
+    showSpeed(lastSpeedKmh);
+    showDistance();
+    renderHistory();
+    renderGarage();
+  }
+
+  function saveSettings() {
+    return writeStore(STORE_SETTINGS, settings);
+  }
+
+  function onUnitsChange() {
+    settings.units = (setImperial && setImperial.checked) ? "imperial" : "metric";
+    var ok = saveSettings();
+    applyUnits();
+    setSettingsMsg(ok ? "Saved on this phone." : "Could not save on this phone. This will reset when you refresh.");
+  }
+
+  if (setMetric) { setMetric.addEventListener("change", onUnitsChange); }
+  if (setImperial) { setImperial.addEventListener("change", onUnitsChange); }
+
+  if (setAwake) {
+    setAwake.addEventListener("change", function () {
+      settings.wakeLock = setAwake.checked;
+      var ok = saveSettings();
+      if (state === "riding") {
+        if (settings.wakeLock) { requestWakeLock(); } else { releaseWakeLock(); }
+      }
+      setSettingsMsg(ok ? "Saved on this phone." : "Could not save on this phone. This will reset when you refresh.");
+    });
+  }
+
+  if (setReset) {
+    setReset.addEventListener("click", function () {
+      settings = { units: "metric", wakeLock: true };
+      removeStore(STORE_SETTINGS);
+      syncSettingsControls();
+      applyUnits();
+      if (state === "riding") { requestWakeLock(); }
+      setSettingsMsg("Settings reset.");
+    });
+  }
+
+  if (setErase) {
+    setErase.addEventListener("click", function () {
+      if (!window.confirm("Erase your saved settings and emergency contacts from this phone?")) { return; }
+      removeStore(STORE_SETTINGS);
+      removeStore(STORE_CONTACTS);
+      settings = { units: "metric", wakeLock: true };
+      contacts = [];
+      syncSettingsControls();
+      applyUnits();
+      renderContacts();
+      if (state === "riding") { requestWakeLock(); }
+      setSettingsMsg("Saved settings and emergency contacts were erased.");
+      setContactMsg("");
+    });
+  }
 
   /* ---------- Section switching (unchanged from Phase 1) ---------- */
   function showView(name, moveFocus) {
@@ -434,17 +795,24 @@
     showView(window.location.hash.replace("#", ""), true);
   });
 
-  /* ---------- Gauge tick marks (unchanged from Phase 1) ---------- */
+  /* ---------- Gauge tick marks (Phase 1 look; the scale follows your units) ---------- */
   function buildTicks() {
     var group = document.getElementById("ticks");
     if (!group) { return; }
-    var NS = "http://www.w3.org/2000/svg";
-    var cx = 150, cy = 150, outer = 104, MAX = 160;
+    while (group.firstChild) { group.removeChild(group.firstChild); }
 
-    for (var v = 0; v <= MAX; v += 10) {
-      var major = (v % 20 === 0);
+    var NS = "http://www.w3.org/2000/svg";
+    var cx = 150, cy = 150, outer = 104;
+    var MAX = isImperial() ? 100 : 160;          /* top of the scale */
+    var STEP = isImperial() ? 5 : 10;            /* small tick every STEP */
+    var MAJOR = isImperial() ? 10 : 20;          /* long gold tick every MAJOR */
+    var LABEL = isImperial() ? 20 : 40;          /* number every LABEL */
+
+    for (var v = 0; v <= MAX; v += STEP) {
+      var major = (v % MAJOR === 0);
       var angle = (135 + (v / MAX) * 270) * Math.PI / 180;
       var len = major ? 12 : 6;
+      var delay = Math.round((v / MAX) * 160 * 3) + "ms";
       var line = document.createElementNS(NS, "line");
       line.setAttribute("x1", (cx + Math.cos(angle) * outer).toFixed(2));
       line.setAttribute("y1", (cy + Math.sin(angle) * outer).toFixed(2));
@@ -454,10 +822,10 @@
       line.setAttribute("stroke-width", major ? "2" : "1.5");
       line.setAttribute("stroke-linecap", "round");
       line.setAttribute("class", "tick");
-      line.style.animationDelay = (v * 3) + "ms";
+      line.style.animationDelay = delay;
       group.appendChild(line);
 
-      if (v % 40 === 0) {
+      if (v % LABEL === 0) {
         var label = document.createElementNS(NS, "text");
         label.setAttribute("x", (cx + Math.cos(angle) * 84).toFixed(2));
         label.setAttribute("y", (cy + Math.sin(angle) * 84 + 4).toFixed(2));
@@ -465,7 +833,7 @@
         label.setAttribute("fill", "#9a9a9a");
         label.setAttribute("font-size", "12");
         label.setAttribute("class", "tick");
-        label.style.animationDelay = (v * 3) + "ms";
+        label.style.animationDelay = delay;
         label.textContent = String(v);
         group.appendChild(label);
       }
@@ -496,9 +864,20 @@
   }
 
   /* ---------- Start (no location is requested here) ---------- */
+  loadSettings();
+  loadContacts();
+  syncSettingsControls();
+
   if (hintEl) { hintEl.setAttribute("aria-live", "polite"); }
-  buildTicks();
+  if (previewNote) { previewNote.textContent = "Live GPS ride tracking. Figures are estimates and are not saved after you refresh."; }
+  if (setAwake && !("wakeLock" in navigator)) {
+    setAwake.disabled = true;
+    if (awakeNote) { awakeNote.textContent = "This browser cannot keep the screen on. Keep it awake yourself while riding."; }
+  }
+
   buildMap();
+  applyUnits();
+  renderContacts();
   showView(window.location.hash.replace("#", ""), false);
 
   if (!supported) {
