@@ -1,0 +1,191 @@
+/* MAYA LIVE TRACKING - Phase 1 design. BLACKOUT x GOLD. */
+
+:root{
+  --obsidian:#080909;
+  --bg:#101112;
+  --card:#171717;
+  --line:#303030;
+  --gold:#C9A44C;
+  --gold-hi:#E4C56A;
+  --text:#F5F3ED;
+  --muted:#9a9a9a;
+  --font:"Bahnschrift","DIN Alternate","Avenir Next Condensed","Arial Narrow","Roboto Condensed","Helvetica Neue",Arial,sans-serif;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--obsidian);
+  background-image:radial-gradient(90% 38% at 50% 0,#1a1a19 0,rgba(8,9,9,0) 70%);
+  background-repeat:no-repeat;
+  color:var(--text);
+  font-family:var(--font);
+  font-size:16px;
+  line-height:1.45;
+}
+[hidden]{display:none!important}
+h1,h2,h3,p,ul,dl,dd,dt{margin:0;padding:0}
+ul{list-style:none}
+button{font:inherit;color:inherit}
+
+:focus-visible{outline:2px solid var(--gold-hi);outline-offset:3px;border-radius:6px}
+
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.skip{position:absolute;left:12px;top:-60px;z-index:100;background:var(--gold-hi);color:#080909;padding:10px 14px;border-radius:10px;font-weight:700;text-decoration:none}
+.skip:focus{top:calc(var(--safe-top) + 10px)}
+
+/* ---------- Header ---------- */
+.head{
+  position:sticky;top:0;z-index:20;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:calc(10px + var(--safe-top)) 16px 10px;
+  background:rgba(8,9,9,.92);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.mark{width:34px;height:34px;flex:none;border-radius:8px;box-shadow:0 0 0 1px #3a3220}
+.wordmark{font-size:15px;font-weight:700;letter-spacing:.18em;color:var(--gold-hi);white-space:nowrap}
+.bike{display:flex;align-items:center;gap:10px;text-align:right}
+.swatch{
+  width:22px;height:22px;flex:none;border-radius:50%;
+  background:radial-gradient(circle at 32% 28%,#2b2b2b 0,#0a0a0a 62%);
+  box-shadow:0 0 0 2px var(--obsidian),0 0 0 3px var(--gold);
+}
+.bike-text{display:flex;flex-direction:column;line-height:1.15;text-align:left}
+.bike-model{font-size:14px;font-weight:600}
+.bike-sub{display:none;font-size:12px;color:var(--muted)}
+
+/* ---------- Navigation (bottom bar on phones) ---------- */
+.nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  background:rgba(8,9,9,.96);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border-top:1px solid var(--line);
+  padding-bottom:var(--safe-bottom);
+}
+.nav ul{display:grid;grid-template-columns:repeat(5,1fr)}
+.nav button{
+  width:100%;min-height:62px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  background:none;border:0;border-top:2px solid transparent;
+  color:var(--muted);font-size:12px;letter-spacing:.04em;cursor:pointer;
+}
+.nav svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.nav button[aria-current="page"]{color:var(--gold-hi);border-top-color:var(--gold)}
+.nav button:hover{color:var(--text)}
+.nav button[aria-current="page"]:hover{color:var(--gold-hi)}
+
+/* ---------- Main ---------- */
+.main{padding:16px 16px calc(92px + var(--safe-bottom))}
+.view-title{font-size:26px;font-weight:600;letter-spacing:.04em;margin-bottom:6px}
+.view-title:focus{outline:none}
+.view-title:focus-visible{outline:2px solid var(--gold-hi);outline-offset:4px}
+.preview-note{color:var(--muted);font-size:14px;margin-bottom:18px}
+
+.ride-grid{display:grid;gap:20px}
+
+/* ---------- The instrument cluster (the one memorable thing) ---------- */
+.cluster{position:relative;width:min(100%,360px);margin:0 auto}
+.gauge{display:block;width:100%;height:auto;filter:drop-shadow(0 0 22px rgba(201,164,76,.1))}
+.gauge-read{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:6%;text-align:center}
+.speed{display:flex;align-items:baseline;gap:8px;font-variant-numeric:tabular-nums}
+.speed-num{font-size:clamp(64px,19vw,88px);font-weight:300;line-height:1;letter-spacing:.02em}
+.speed-unit{font-size:20px;color:var(--gold-hi);letter-spacing:.06em}
+.speed-note{margin-top:8px;font-size:14px;color:var(--muted)}
+.tick{opacity:1}
+@media (prefers-reduced-motion:no-preference){
+  .tick{opacity:0;animation:tickIn .35s ease-out forwards}
+  @keyframes tickIn{to{opacity:1}}
+}
+
+/* ---------- Status chips ---------- */
+.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:4px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid var(--line);border-radius:999px;font-size:14px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:#555}
+
+/* ---------- Readouts ---------- */
+.readouts{display:grid;grid-template-columns:1fr 1fr;margin-top:20px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.readouts>div{padding:14px 4px;text-align:center}
+.readouts>div+div{border-left:1px solid var(--line)}
+.readouts dt{font-size:14px;color:var(--muted);margin-bottom:2px}
+.readouts dd{font-size:30px;font-weight:300;font-variant-numeric:tabular-nums;letter-spacing:.03em}
+.readouts .unit{font-size:16px;color:var(--gold-hi)}
+
+/* ---------- Ride controls ---------- */
+.controls{display:grid;grid-template-columns:1.4fr 1fr;gap:12px;margin-top:20px}
+.btn{
+  min-height:56px;padding:0 18px;border-radius:14px;
+  font-family:var(--font);font-size:18px;font-weight:600;letter-spacing:.06em;cursor:pointer;
+}
+.btn.start{background:linear-gradient(180deg,var(--gold-hi),var(--gold));color:#0b0b0a;border:0}
+.btn.end{background:transparent;color:var(--text);border:1px solid #555}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.hint{margin-top:10px;font-size:14px;color:var(--muted);text-align:center}
+
+/* ---------- Map preview ---------- */
+.map-frame{position:relative;height:280px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#0d0e0e}
+#map{position:absolute;inset:0;background:#0d0e0e}
+#map .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.72) contrast(.95) saturate(.3)}
+#map .leaflet-control-attribution{background:rgba(8,9,9,.8);color:var(--muted);font-size:11px}
+#map .leaflet-control-attribution a{color:var(--gold-hi)}
+.map-overlay{
+  position:absolute;left:0;right:0;top:0;bottom:24px;z-index:500;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  padding:16px;text-align:center;pointer-events:none;
+  background:rgba(8,9,9,.74);
+}
+.map-overlay svg{width:34px;height:34px;fill:none;stroke:var(--gold);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;margin-bottom:4px}
+.overlay-title{font-size:18px;font-weight:600}
+.overlay-text{font-size:14px;color:var(--muted);max-width:30ch}
+
+/* ---------- Coming soon views ---------- */
+.soon{max-width:560px}
+.tag{display:inline-block;margin:6px 0 14px;padding:3px 12px;border:1px solid var(--gold);border-radius:999px;color:var(--gold-hi);font-size:14px}
+.soon-lead{font-size:18px;max-width:42ch;margin-bottom:16px}
+.soon-list{border-top:1px solid var(--line)}
+.soon-list li{position:relative;padding:12px 0 12px 22px;border-bottom:1px solid var(--line);color:var(--muted)}
+.soon-list li::before{content:"";position:absolute;left:4px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--gold)}
+
+/* ---------- Wider phones and tablets ---------- */
+@media (min-width:480px){
+  .bike-sub{display:block}
+}
+
+/* ---------- Desktop ---------- */
+@media (min-width:900px){
+  .app{
+    display:grid;
+    grid-template-columns:272px minmax(0,1fr);
+    grid-template-rows:auto 1fr;
+    grid-template-areas:"head main" "nav main";
+    min-height:100vh;
+  }
+  .head{
+    grid-area:head;position:static;flex-direction:column;align-items:flex-start;gap:18px;
+    padding:28px 24px 20px;background:none;-webkit-backdrop-filter:none;backdrop-filter:none;
+    border-bottom:0;border-right:1px solid var(--line);
+  }
+  .wordmark{white-space:normal;font-size:16px;line-height:1.3}
+  .brand{align-items:flex-start}
+  .bike{text-align:left}
+  .bike-sub{display:block}
+  .nav{
+    grid-area:nav;position:static;background:none;-webkit-backdrop-filter:none;backdrop-filter:none;
+    border-top:0;border-right:1px solid var(--line);padding:0 12px 24px;
+  }
+  .nav ul{display:flex;flex-direction:column;gap:4px}
+  .nav button{
+    flex-direction:row;justify-content:flex-start;gap:14px;min-height:52px;padding:0 14px;
+    border-top:0;border-left:2px solid transparent;border-radius:10px;font-size:16px;
+  }
+  .nav button[aria-current="page"]{border-left-color:var(--gold);background:#141414}
+  .main{grid-area:main;padding:32px 40px 40px}
+  .view-title{font-size:30px}
+  .ride-grid{grid-template-columns:minmax(320px,400px) minmax(0,1fr);gap:40px;align-items:start}
+  .ride-right{position:sticky;top:32px}
+  .map-frame{height:min(72vh,680px);min-height:420px}
+}
